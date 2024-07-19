@@ -1,3 +1,4 @@
+import time
 import cv2
 import numpy as np
 import os
@@ -14,7 +15,6 @@ TEST_SIZE = 0.4
 
 
 def main():
-
     # Check command-line arguments
     if len(sys.argv) not in [2, 3]:
         sys.exit("Usage: python traffic.py data_directory [model.h5]")
@@ -27,7 +27,7 @@ def main():
     x_train, x_test, y_train, y_test = train_test_split(
         np.array(images), np.array(labels), test_size=TEST_SIZE
     )
-#hi
+
     # Get a compiled neural network
     model = get_model()
 
@@ -58,8 +58,30 @@ def load_data(data_dir):
     be a list of integer labels, representing the categories for each of the
     corresponding `images`.
     """
-    raise NotImplementedError
+    images = []
+    labels = []
+    
+    for category in range(NUM_CATEGORIES):
+        # Creates path to each category inside gtsrb 
+        # Result: gtsrb/#
+        category_directory = os.path.join(data_dir, str(category))
 
+        # Check if folder exists
+        if os.path.isdir(category_directory):
+            print(f"Processing category: {category} from {category_directory}")
+            start_time = time.time()
+            # Loop through each file in each folder
+            for filename in os.listdir(category_directory):
+                # Creates path to each imagine inside each catgory
+                # Result: gtsrb/#/00000_00001.ppm
+                image_path = os.path.join(category_directory, filename)
+                image = cv2.imread(image_path)
+                image = cv2.resize(image, (IMG_WIDTH, IMG_HEIGHT))
+                images.append(image)
+                labels.append(category)
+            end_time = time.time()
+            print(f"Category {category} processed in {end_time - start_time:.2f} seconds")
+    return images, labels
 
 def get_model():
     """
@@ -67,8 +89,42 @@ def get_model():
     `input_shape` of the first layer is `(IMG_WIDTH, IMG_HEIGHT, 3)`.
     The output layer should have `NUM_CATEGORIES` units, one for each category.
     """
-    raise NotImplementedError
+    # Create a convolutional neural network
+    model = tf.keras.models.Sequential([
 
+        # Convolutional layers. Learn many different filters using a 3x3 and one 2x2 kernels
+        tf.keras.layers.Conv2D(
+            64, (3, 3), activation="relu", input_shape=(IMG_WIDTH, IMG_HEIGHT, 3)
+        ),
+        tf.keras.layers.Conv2D(
+            64, (3, 3), activation="relu", input_shape=(IMG_WIDTH, IMG_HEIGHT, 3)
+        ),
+        # tf.keras.layers.Conv2D(
+        #     32, (3, 3), activation="relu", input_shape=(IMG_WIDTH, IMG_HEIGHT, 3)
+        # ),
+        # Max-pooling layer, using 2x2 pool size - changed to (4,4)
+        tf.keras.layers.MaxPooling2D(pool_size=(4, 4)),
+
+        # Flatten units
+        tf.keras.layers.Flatten(),
+
+        # Add three hidden layers with dropout - added two others layer with 64 units
+        tf.keras.layers.Dense(128, activation="relu"),
+        tf.keras.layers.Dense(64, activation="relu"),
+        tf.keras.layers.Dense(64, activation="relu"),
+        # Dropout helped increases the accuracy although with 0.5, it decreased the accuracy by a lot
+        tf.keras.layers.Dropout(0.2),
+        # Add an output layer with output units for all 10 digits
+        tf.keras.layers.Dense(NUM_CATEGORIES, activation="softmax")
+    ])
+
+    # Train neural network
+    model.compile(
+        optimizer="adam",
+        loss="categorical_crossentropy",
+        metrics=["accuracy"]
+    )
+    return model
 
 if __name__ == "__main__":
     main()
